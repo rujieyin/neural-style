@@ -1,0 +1,11 @@
+.*.swp
+.*.swo
+*.mat
+.ipynb_checkpoints
+output/*
+output-bk/*
+images/*
+*.mat
+*.jpg
+*.png
+
