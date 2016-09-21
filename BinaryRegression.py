@@ -49,6 +49,16 @@ class Weights:
     def sqr_norm(self):
         return sum([tf.reduce_sum(tf.square(w)) for _, w in self.weights.iteritems()])
 
+    def l1_norm(self):
+        return sum([tf.reduce_sum(tf.abs(w)) for _, w in self.weights.iteritems()])
+
+    def soft_thresh(self, s):
+        W = Weights(shape = self.shape)
+        for key, w in self.weights.iteritems():
+            W.weights[key] = tf.maximum(tf.abs(w) - s, tf.zeros(w.get_shape()))
+            W.weights[key] = tf.mul(tf.sign(w), W.weights[key])
+        return W
+
     def compute_reg(self, graph):
 
         def _inner_prod(t1, t2):
@@ -84,6 +94,31 @@ def start_session(model_var):
     sess.run(tf.initialize_all_variables())
     return sess
 
+def update_z(z, beta, u, s):
+    op = []
+    for key, val in beta.add(u).soft_thresh(s).weights.iteritems():
+        op.append(z.weights[key].assign(val))
+    return tf.group(*op)
+
+def check(z, beta, u, s):
+    tmp = beta.add(u).soft_thresh(s)
+    min_nz = []
+    for _, val in tmp.weights.iteritems():
+        min_nz.append( tf.reduce_min(tf.abs(val) + tf.scalar_mul(1,tf.to_float(tf.equal(val, 0))) ) )
+    return tf.reduce_min(tf.pack(min_nz))
+
+def update_u(u, beta, z):
+    op = []
+    for key, val in u.add(beta).sub(z).weights.iteritems():
+        op.append(u.weights[key].assign(val))
+    return tf.group(*op)
+
+def tf_count_nonzero(t):
+    elements_equal_to_value = tf.equal(t, 0)
+    as_ints = tf.cast(tf.equal(t, 0), tf.int32)
+    count = tf.size(t) - tf.reduce_sum(as_ints)
+    return count
+
 def binary_reg():
     # Content image to use.
     CONTENT_IMAGE = 'images/inputs/hummingbird-photo_p1-rot.jpg' #'images/inputs/hummingbird-small.jpg'
@@ -102,23 +137,57 @@ def binary_reg():
     u = Weights(graph = graph)
 
     loss = reg_loss(regs, labels) + residual_loss(beta, z, u)
-    opt = tf.train.AdamOptimizer(learning_rate=0.0000001)
-    opt_op = opt.minimize(loss, var_list=beta.weights.values())
 
     sess = start_session(model_var)
 
     print( "total number of weight variables: %.4e" % sess.run(sum([tf.size(v) for key, v in beta.weights.iteritems()])) )
 
-    loss_val = sess.run(loss)
+    # add tensorboard summaries
+    for key, val in beta.weights.iteritems():
+        tf.histogram_summary("beta-"+key, val, collections = ("beta", ) )
+    merged_beta = tf.merge_all_summaries("beta")
+    for key, val in z.weights.iteritems():
+        tf.histogram_summary("z-"+key, val, collections = ("z", ) )
+        tf.scalar_summary("nnz/z-"+key, tf_count_nonzero(val), collections = ("z", ) )
+        tf.scalar_summary("l1/z-"+key, tf.reduce_sum(tf.abs(val)), collections = ("z", ) )
+    merged_z = tf.merge_all_summaries("z")
+    writer = tf.train.SummaryWriter("output/logs/{}".format(time.strftime('%Y-%m-%d_%H%M%S')), sess.graph)
+
+    # create a placeholder so that lr can be updated during iteration
+    learning_rate = tf.placeholder(tf.float32, shape=[])
+    opt = tf.train.GradientDescentOptimizer(learning_rate = learning_rate)#0.000001)
+    opt_op = opt.minimize(loss, var_list=beta.weights.values())
+
     itr = 0
-    while loss_val > 1.0e-2 :
-        print("iteration %d:" % itr)
-        opt_op.run()
-        print("loss: %.4e" % loss_val)
+    lr = 1e-6 # fixed
+    s = 1e-6
+    loss_bd = 1.0e-5
+    z_norm = 1
+    max_nitr = 200
+
+    while z_norm > 1e-30 and itr < max_nitr:
+        writer.add_summary(sess.run(merged_z), itr)
         loss_val = sess.run(loss)
-        itr = itr + 1
-        # print( "reg_loss: %.4e" % sess.run(reg_loss(regs, labels)))
-        # print( "residual_loss: %.4e" % sess.run(residual_loss(beta, z, u)))
+        loss_bk = 1e10
+        print("iteration %d, loss: %.4e" % (itr, loss_val))
+        while loss_bk > loss_val + 1e-6:
+            print("iteration %d:" % itr)
+            sess.run(opt_op, feed_dict={learning_rate: lr})#opt_op.run()
+            loss_bk = loss_val
+            loss_val = sess.run(loss)
+            print("loss: %.4e" % loss_val)
+            writer.add_summary(sess.run(merged_beta), itr)
+            itr = itr + 1
+        print("before updata: %.4e" % sess.run(z.l1_norm()))
+        print("before threshold: %.4e" % sess.run(beta.add(u).l1_norm()))
+        sess.run(update_z(z, beta, u, s))
+        print("after threshold: %.4e" % sess.run(z.l1_norm()))
+        sess.run(update_u(u, beta, z))
+        z_norm = sess.run(z.sqr_norm())
+        writer.add_summary(sess.run(merged_z), itr)
+        s = s * 1.2 # faster than equispaced stepsize
+        print("update u and z, new threshold: %.2e" % s)
+
 
 if __name__ == '__main__':
     binary_reg()
