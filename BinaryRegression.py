@@ -14,6 +14,8 @@ from util import *
 IMAGE_HEIGHT = 227
 IMAGE_WIDTH = 227
 COLOR_CHANNELS = 3
+CROP_HEIGHT = 127
+CROP_WIDTH = 127
 
 VGG_MODEL = 'imagenet-vgg-verydeep-19.mat'
 
@@ -23,16 +25,22 @@ class Weights:
         self.weights = {}
         graph = kwargs.get('graph', None)
         shape = kwargs.get('shape', None)
-        if graph:
+        npzfile = kwargs.get('npzfile', None)
+        if graph: # initialize by corresponding graph structure
             for key, _ in graph.iteritems():
                 # remove first dim for batch size
                 weight_shape = graph[key].get_shape()[1:]
                 self.weights[key+'_w'] = tf.Variable(tf.zeros(weight_shape), name = key+'_w')
             self.shape = { key: weight.get_shape() for key, weight in self.weights.iteritems() }
-        else:
+        elif shape: # initialize w.r.t shape of existing Weight
             for key, s in shape.iteritems():
                 self.weights[key] = tf.Variable(tf.zeros(s), name = key)
             self.shape = shape
+        else: # initialize from loaded file
+            for key, value in npzfile.iteritems():
+                self.weights[key] = tf.Variable(value, name = key)
+            self.shape = { key: weight.get_shape() for key, weight in self.weights.iteritems() }
+
 
     def add(self, W): #  NOT inplace sum
         Sum = Weights(shape = self.shape)
@@ -119,58 +127,89 @@ def tf_count_nonzero(t):
     count = tf.size(t) - tf.reduce_sum(as_ints)
     return count
 
-def binary_reg():
+def save_Weight(filename, w):
+    # evaluate values in weight tensors and save by layer names
+    np.savez(filename, **{key: value.eval() for key, value in w.weights.iteritems()})
+
+def load_Weight(filename):
+    Wfile = np.load(filename)
+    return Weights(npzfile = Wfile)
+
+def prepare_input(images, labels, Ncrops):
+#    Ncrops = 10
+    crop_shape = [2, CROP_HEIGHT, CROP_WIDTH, COLOR_CHANNELS]
+    random_crop_images = tf.concat(0, [tf.random_crop(images, crop_shape) for i in range(Ncrops)])
+    labels = tf.to_float(tf.tile(labels, [Ncrops]))
+    return (random_crop_images, labels)
+
+@click.command()
+@click.option("--numcrops", "-n", type=int, default=10, help="number of random crops from images")
+
+def binary_reg(numcrops):
     # Content image to use.
     CONTENT_IMAGE = 'images/inputs/hummingbird-photo_p1-rot.jpg' #'images/inputs/hummingbird-small.jpg'
     content_image = load_image(CONTENT_IMAGE, image_width=IMAGE_WIDTH, image_height=IMAGE_HEIGHT)
     # Style image to use.
     STYLE_IMAGE = 'images/inputs/Nr2_original_p1-ds.jpg' #'images/inputs/Nr2_orig.jpg'
     style_image = load_image(STYLE_IMAGE, image_width=IMAGE_WIDTH, image_height=IMAGE_HEIGHT)
-    labels = tf.constant([0 , 1], dtype = 'float32')
+    images, labels = prepare_input(tf.concat(0, [content_image, style_image]) , [0,1] , numcrops)
 
-    graph, model_var = build_graph(tf.concat(0, [content_image, style_image]))
+    # images = tf.concat(0, [content_image, style_image])
+    # labels = tf.constant([0 , 1], dtype = 'float32')
+
+    graph, model_var = build_graph(images)
 
     beta = Weights(graph = graph)
     regs = beta.compute_reg(graph)
 
     z = Weights(graph = graph)
     u = Weights(graph = graph)
+    s = tf.Variable(1e-6, name = 's') # threshold
 
     loss = reg_loss(regs, labels) + residual_loss(beta, z, u)
 
     sess = start_session(model_var)
+    print('shape of input images: {}'.format(tf.shape(images).eval()))
+    print('shape of input labels: {}'.format(tf.shape(labels).eval()))
 
     print( "total number of weight variables: %.4e" % sess.run(sum([tf.size(v) for key, v in beta.weights.iteritems()])) )
 
     # add tensorboard summaries
+    tf.scalar_summary("threshold", s)
+    merged = tf.merge_all_summaries()
     for key, val in beta.weights.iteritems():
         tf.histogram_summary("beta-"+key, val, collections = ("beta", ) )
     merged_beta = tf.merge_all_summaries("beta")
+    nonzero_hist = []
     for key, val in z.weights.iteritems():
         tf.histogram_summary("z-"+key, val, collections = ("z", ) )
-        tf.scalar_summary("nnz/z-"+key, tf_count_nonzero(val), collections = ("z", ) )
+        count = tf_count_nonzero(val)
+        nonzero_hist.append(count)
+        tf.scalar_summary("nnz/z-"+key, count, collections = ("z", ) )
         tf.scalar_summary("l1/z-"+key, tf.reduce_sum(tf.abs(val)), collections = ("z", ) )
+    tf.histogram_summary("z-nonzero", tf.pack(nonzero_hist), collections = ("z", ))
     merged_z = tf.merge_all_summaries("z")
-    writer = tf.train.SummaryWriter("output/logs/{}".format(time.strftime('%Y-%m-%d_%H%M%S')), sess.graph)
 
-    # create a placeholder so that lr can be updated during iteration
+    # create a placeholder so that lr can be updated during iteration, not
     learning_rate = tf.placeholder(tf.float32, shape=[])
     opt = tf.train.GradientDescentOptimizer(learning_rate = learning_rate)#0.000001)
     opt_op = opt.minimize(loss, var_list=beta.weights.values())
 
     itr = 0
-    lr = 1e-6 # fixed
-    s = 1e-6
+    lr = 4e-6#1e-6 # fixed
+    precision = 1e-4 #1e-6
     loss_bd = 1.0e-5
     z_norm = 1
     max_nitr = 200
+
+    writer = tf.train.SummaryWriter("output/logs/{}".format(time.strftime('%Y-%m-%d_%H%M%S')), sess.graph)
 
     while z_norm > 1e-30 and itr < max_nitr:
         writer.add_summary(sess.run(merged_z), itr)
         loss_val = sess.run(loss)
         loss_bk = 1e10
         print("iteration %d, loss: %.4e" % (itr, loss_val))
-        while loss_bk > loss_val + 1e-6:
+        while loss_bk > loss_val + precision:
             print("iteration %d:" % itr)
             sess.run(opt_op, feed_dict={learning_rate: lr})#opt_op.run()
             loss_bk = loss_val
@@ -178,16 +217,15 @@ def binary_reg():
             print("loss: %.4e" % loss_val)
             writer.add_summary(sess.run(merged_beta), itr)
             itr = itr + 1
-        print("before updata: %.4e" % sess.run(z.l1_norm()))
-        print("before threshold: %.4e" % sess.run(beta.add(u).l1_norm()))
         sess.run(update_z(z, beta, u, s))
-        print("after threshold: %.4e" % sess.run(z.l1_norm()))
+        print('|z| = {:.4e}'.format(z.l1_norm().eval()))
         sess.run(update_u(u, beta, z))
         z_norm = sess.run(z.sqr_norm())
+        save_Weight('output/z/z_thresh-{:.2e}'.format(s.eval()), z)
         writer.add_summary(sess.run(merged_z), itr)
-        s = s * 1.2 # faster than equispaced stepsize
-        print("update u and z, new threshold: %.2e" % s)
-
+        writer.add_summary(sess.run(merged), itr)
+        sess.run(s.assign(s * 1.2))#s = s * 1.2 # faster than equispaced stepsize
+        print("update u and z, new threshold: %.2e" % s.eval())
 
 if __name__ == '__main__':
     binary_reg()

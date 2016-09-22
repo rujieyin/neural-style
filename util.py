@@ -103,3 +103,15 @@ def save_image(path, image):
     image = image[0]
     image = np.clip(image, 0, 255).astype('uint8')
     scipy.misc.imsave(path, image)
+
+# generated images have unspecified shape 
+def generate_cropped_image(images, crop_height, crop_width, Ncrops = 10):
+    images_shape = tf.shape(images)
+    dyn_output_shape = [2, crop_height, 127, 3]
+    if tf.rank(images) == 3: # single image
+        return tf.pack([tf.random_crop(images, [crop_height, crop_width, images_shape[2]]) for i in range(Ncrops)])
+    else: # multiple images, generate random crops at the same locations
+        tf.Variable(tf.zeros(tf.random_crop(images, dyn_output_shape).get_shape()))
+        return tf.concat(0, \
+                    [tf.random_crop(images, [images_shape[0], crop_height, crop_width, images_shape[3]]) \
+                    for i in range(Ncrops)])
