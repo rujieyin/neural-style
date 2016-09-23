@@ -14,8 +14,7 @@ from util import *
 
 # Noise ratio. Percentage of weight of the noise for intermixing with the
 # content image.
-NOISE_RATIO = 0.6#0.6
-
+NOISE_RATIO = 0#0.6
 
 def content_loss_func(sess, model):
     """
@@ -82,6 +81,42 @@ def style_loss_func(sess, model):
     loss = sum([W[l] * E[l] for l in range(len(STYLE_LAYERS))])
     return loss
 
+def style_loss_func_new(sess, model, filters):
+
+    def _get_filter_coeffs(x, findex):
+        rank_x = 4
+        begin_idx = [0] * (rank_x - 1)
+        slice_size = [-1] * (rank_x - 1) + [1]
+        return tf.concat(rank_x-1, [tf.slice(x, begin_idx + [i], slice_size) for i in findex])
+
+    def _gram_matrix(F, N, M):
+        """
+        The gram matrix G.
+        """
+        Ft = tf.reshape(F, (M, N))
+        return tf.matmul(tf.transpose(Ft), Ft)
+
+    def _style_loss(a, x, fs):
+        findex = fs.keys()
+        fw = tf.constant(fs.values(), dtype='float32')#fw = [fs[i] for i in findex]
+        a_sub = _get_filter_coeffs(a, findex)
+        x_sub = _get_filter_coeffs(x, findex)
+        # add weights
+        a_sub = tf.div(tf.mul(fw, a_sub), tf.reduce_sum(fw))
+        x_sub = tf.div(tf.mul(fw, x_sub), tf.reduce_sum(fw))
+        sub_shape = tf.shape(a_sub)
+        N = sub_shape[3]
+        M = sub_shape[1] * sub_shape[2]
+        A = _gram_matrix(a_sub, N, M)
+        G = _gram_matrix(x_sub, N, M)
+        normalization = 4 * tf.square(tf.to_float(N*M)) # otherwise (N*M)**2 may be out of bound
+        result =  tf.div( tf.reduce_sum(tf.pow(G - A, 2)) , normalization)
+        return result
+
+    total_weights = tf.to_float(tf.add_n([ tf.add_n(dic.values()) for dic in filters.values()]))
+    E = [_style_loss(sess.run(model[layer_name]), model[layer_name], filters[layer_name]) for layer_name in filters.keys()]
+    return tf.div(tf.add_n(E), total_weights)
+
 def tv_loss_func(image):
     image = tf.squeeze(image) # remove first dimension
     image_size = tf.to_int32(image.get_shape())
@@ -121,9 +156,9 @@ def train(restore):
     # Initial imae to use.
     INITIAL_IMAGE = restore #'output/12000.png'
     # Constant to put more emphasis on content loss.
-    BETA = 5
+    BETA = 0#5
     # Constant to put more emphasis on style loss.
-    ALPHA = 1#100
+    ALPHA = tf.constant(1.0)#100
     # Path to the deep learning model. This is more than 500MB so will not be
     # included in the repository, but available to download at the model Zoo:
     # Link: https://github.com/BVLC/caffe/wiki/Model-Zoo
@@ -161,7 +196,8 @@ def train(restore):
     content_loss = content_loss_func(sess, model)
     # Construct style_loss using style_image.
     sess.run(model['input'].assign(style_image))
-    style_loss = style_loss_func(sess, model)
+    style_loss = style_loss_func_new(sess, model,load_dictionary("test.pkl"))
+    # style_loss = style_loss_func(sess, model)
     # total variation loss on reconstruction
     tv_loss = tv_loss_func(model['input'])
     # Instantiate equation 7 of the paper.
@@ -191,7 +227,7 @@ def train(restore):
             # print('tv_loss: %.2f' % tv_loss_val * 1e-3)
             # print('content_loss: %.2f' % content_loss_val * BETA)
             # print('style_loss: %.2f' % style_loss_val * ALPHA)
-            print('total_loss: %.2f' % total_loss_val)
+            print('total_loss: %.4e' % total_loss_val)
 
             if not os.path.exists(OUTPUT_DIR):
                 os.mkdir(OUTPUT_DIR)

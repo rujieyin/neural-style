@@ -3,6 +3,7 @@ import scipy.io
 import scipy.misc
 import tensorflow as tf  # Import TensorFlow after Scipy or Scipy will break
 from PIL import Image
+import pickle
 
 # The mean to subtract from the input to the VGG model. This is the mean that
 # when the VGG was used to train. Minor changes to this will make a lot of
@@ -104,7 +105,7 @@ def save_image(path, image):
     image = np.clip(image, 0, 255).astype('uint8')
     scipy.misc.imsave(path, image)
 
-# generated images have unspecified shape 
+# generated images have unspecified shape
 def generate_cropped_image(images, crop_height, crop_width, Ncrops = 10):
     images_shape = tf.shape(images)
     dyn_output_shape = [2, crop_height, 127, 3]
@@ -115,3 +116,12 @@ def generate_cropped_image(images, crop_height, crop_width, Ncrops = 10):
         return tf.concat(0, \
                     [tf.random_crop(images, [images_shape[0], crop_height, crop_width, images_shape[3]]) \
                     for i in range(Ncrops)])
+
+def write_dictionary(d, filename):
+    with open(filename, 'wb') as f:
+        pickle.dump(d, f)
+
+def load_dictionary(filename):
+    with open(filename, 'r') as f:
+        filters = pickle.load(f)
+    return filters
