@@ -14,7 +14,7 @@ from util import *
 
 # Noise ratio. Percentage of weight of the noise for intermixing with the
 # content image.
-NOISE_RATIO = 0#0.6
+NOISE_RATIO = 0.2#0.6
 
 def content_loss_func(sess, model):
     """
@@ -82,6 +82,36 @@ def style_loss_func(sess, model):
     return loss
 
 def style_loss_func_new(sess, model, filters):
+
+    def _get_filter_weights(fltr, ndim):
+        findex = fltr.keys()
+        findex.sort()
+        # N = tf.size(findex)
+        N = sess.run(tf.size(findex))
+        idx = tf.constant(findex, dtype=tf.int64, shape=[N, 1])
+        value = tf.constant([fltr[fi] for fi in findex], dtype=tf.float32, shape=[N])
+        shape = tf.constant(ndim, dtype=tf.int64, shape=[1])
+        return tf.sparse_tensor_to_dense(tf.SparseTensor(idx, value, shape))
+
+    def _gram_matrix(F, N, M):
+        Ft = tf.reshape(F, (M, N))
+        return tf.matmul(tf.transpose(Ft), Ft)
+
+    def _style_loss(a, x, fs):
+        N = a.shape[3]
+        M = a.shape[1] * a.shape[2]
+        fw = _get_filter_weights(fs, N)
+        A = _gram_matrix(tf.mul(a, fw), N, M)
+        G = _gram_matrix(tf.mul(x, fw), N, M)
+        result = (1.0 / (4 * N**2 * M**2)) * tf.reduce_sum(tf.pow(G - A, 2))
+        return result
+
+    total_weights = tf.to_float(tf.add_n([ tf.add_n(dic.values()) for dic in filters.values()]))
+    E = [_style_loss(sess.run(model[layer_name]), model[layer_name], filters[layer_name]) for layer_name in filters.keys()]
+    return tf.div(tf.add_n(E), total_weights)
+
+
+def style_loss_func_bk(sess, model, filters):
 
     def _get_filter_coeffs(x, findex):
         rank_x = 4
@@ -156,9 +186,9 @@ def train(restore):
     # Initial imae to use.
     INITIAL_IMAGE = restore #'output/12000.png'
     # Constant to put more emphasis on content loss.
-    BETA = 0#5
+    BETA = 5
     # Constant to put more emphasis on style loss.
-    ALPHA = tf.constant(1.0)#100
+    ALPHA = 1#tf.constant(1.0)
     # Path to the deep learning model. This is more than 500MB so will not be
     # included in the repository, but available to download at the model Zoo:
     # Link: https://github.com/BVLC/caffe/wiki/Model-Zoo
@@ -211,7 +241,7 @@ def train(restore):
     tf.scalar_summary("loss/style loss", style_loss)
     tf.scalar_summary("loss/total loss", total_loss)
     merged = tf.merge_all_summaries("summaries")
-    writer = tf.train.SummaryWriter("output/logs/{}".format(time.strftime('%Y-%m-%d_%H%M%S')), sess.graph)
+    writer = tf.train.SummaryWriter("output/logs/{}".format(time.strftime('%Y-%m-%d_%H%M%S')))#, sess.graph)
 
     ITERATIONS = 15000  # The art.py uses 5000 iterations, and yields far more appealing results. If you can wait, use 5000.
     sess.run(tf.initialize_all_variables()) # this initialize new variables from optimizer
