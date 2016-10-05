@@ -211,7 +211,8 @@ def train(restore):
         input_image = load_image(INITIAL_IMAGE, image_width=IMAGE_WIDTH, image_height=IMAGE_HEIGHT)
         print('use initial image: ', INITIAL_IMAGE)
     except:
-        input_image = generate_noise_image(content_image, image_height=IMAGE_HEIGHT, image_width=IMAGE_WIDTH, color_channels=COLOR_CHANNELS)
+        # input_image = generate_noise_image(content_image, image_height=IMAGE_HEIGHT, image_width=IMAGE_WIDTH, color_channels=COLOR_CHANNELS)
+        input_image = generate_noise_image(style_image, image_height=IMAGE_HEIGHT, image_width=IMAGE_WIDTH, color_channels=COLOR_CHANNELS)
 
     # add image summary
     tf.image_summary("style image", tf.to_float(style_image), collections=("input",) )
