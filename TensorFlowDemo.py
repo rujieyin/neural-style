@@ -177,7 +177,7 @@ def generate_noise_image(content_image, image_height, image_width, color_channel
 @click.option("--stylew", "-w", type=float, default=1.0)
 
 
-def train(restore, styleW):
+def train(restore, stylew):
     # Output folder for the images.
     OUTPUT_DIR = 'output/'
     # Style image to use.
@@ -189,7 +189,7 @@ def train(restore, styleW):
     # Constant to put more emphasis on content loss.
     BETA = 5
     # Constant to put more emphasis on style loss.
-    ALPHA = styleW#1#tf.constant(1.0)
+    ALPHA = stylew#1#tf.constant(1.0)
     # Path to the deep learning model. This is more than 500MB so will not be
     # included in the repository, but available to download at the model Zoo:
     # Link: https://github.com/BVLC/caffe/wiki/Model-Zoo
