@@ -208,11 +208,11 @@ def binary_reg(numcrops):
     opt_op = opt.minimize(loss, var_list=beta.weights.values())
 
     itr = 0
-    lr = 4e-6#1e-6 # fixed
+    lr = 4e-2 #4e-6#1e-6 # fixed
     precision = 1e-4 #1e-6
     loss_bd = 1.0e-5
     z_norm = 1
-    max_nitr = 200
+    max_nitr = 300
 
     writer = tf.train.SummaryWriter("output/logs/{}".format(time.strftime('%Y-%m-%d_%H%M%S')), sess.graph)
 

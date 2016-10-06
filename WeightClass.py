@@ -89,8 +89,9 @@ class Weights_covariance(Weights):
             super(Weights_individual, self).__init__(args, kwargs)
 
     def _gram_matrix(self, F):
+        N = F.shape[1]*F.shape[2]
         F = np.split(F, F.shape[0])
-        gram = map(lambda x: np.tensordot(x, x, axes = ( [0,1,2], [0,1,2] )), F)
+        gram = map(lambda x: np.tensordot(x, x, axes = ( [0,1,2], [0,1,2] ))/N**2, F)
         return np.stack(gram)
         # Ft = tf.reshape(F, (M, N))
         # return tf.matmul(tf.transpose(Ft), Ft)
