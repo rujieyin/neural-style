@@ -1,5 +1,4 @@
-## This repo is an extension of the neural-style repo. 
-## The original documentation: 
+## This repo is an extension of the neural-style repo. The original documentation: 
 ### Implementing of a Neural Algorithm of Artistic Style ###
 
 This is an implementation of the "[A Neural Algorithm of Artistic Style](http://arxiv.org/abs/1508.06576)". This uses the selected filtered responses of a pre-trained model (VGG-19) to capture low level to high level features and transfer them to the content image.
