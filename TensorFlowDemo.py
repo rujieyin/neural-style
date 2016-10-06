@@ -174,7 +174,7 @@ def generate_noise_image(content_image, image_height, image_width, color_channel
 
 @click.command()
 @click.option("--restore", "-r", type=click.Path(exists=True, dir_okay=False), default=None)
-@click.option("--stylew", "-w", type=float, default=1.0)
+@click.option("--stylew", "-w", type = float, default=1.0)
 
 
 def train(restore, stylew):
