@@ -19,7 +19,8 @@ CROP_WIDTH = 127
 
 VGG_MODEL = 'imagenet-vgg-verydeep-19.mat'
 
-from WeightClass import Weights_individual as Weights
+# from WeightClass import Weights_individual as Weights
+from WeightClass import Weights_covariance as Weights
 '''
 class Weights:
 
@@ -144,11 +145,11 @@ def prepare_input(images, labels, Ncrops):
     labels = tf.to_float(tf.tile(labels, [Ncrops]))
     return (random_crop_images, labels)
 
-def get_X(graph, sess):
-    X = {}
-    for key, value in graph.iteritems():
-        X[key] = graph[key].eval()
-    return X
+# def get_X(graph, sess):
+#     X = {}
+#     for key, value in graph.iteritems():
+#         X[key] = graph[key].eval()
+#     return X
 
 @click.command()
 @click.option("--numcrops", "-n", type=int, default=10, help="number of random crops from images")
@@ -175,7 +176,7 @@ def binary_reg(numcrops):
 
     sess = start_session(model_var)
 
-    X = get_X(graph, sess)
+    X = beta.get_X(graph, sess) # a dictionary of numpy ndarray (constant)
     regs = beta.compute_reg(X)
 
     loss = reg_loss(regs, labels) + residual_loss(beta, z, u)

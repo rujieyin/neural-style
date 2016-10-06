@@ -58,14 +58,20 @@ class Weights_individual(Weights):
         else:
             super(Weights_individual, self).__init__(args, kwargs)
 
-    def compute_reg(self, graph):
+    def get_X(self, graph, sess):
+        X = {}
+        for key, value in graph.iteritems():
+            X[key] = graph[key].eval()
+        return X
+
+    def compute_reg(self, X):
 
         def _inner_prod(t1, t2):
             # use broadcast of tf.mul, reduce sum in consistant dim
             return tf.reduce_sum(tf.mul(t1,t2), [1, 2, 3])
 
         # sum of inner products of output coeffs and weights
-        return tf.add_n([_inner_prod(weight, graph[key[:-2]]) for key, weight in self.weights.iteritems() ])
+        return tf.add_n([_inner_prod(weight, X[key[:-2]]) for key, weight in self.weights.iteritems() ])
 
 # weights on covariance of filters in each layer
 class Weights_covariance(Weights):
@@ -76,8 +82,29 @@ class Weights_covariance(Weights):
         if graph:
             for key, _ in graph.iteritems():
                 Nfilter = graph[key].get_shape()[3]
-                weight_shape = Nfilter.concatenate(Nfilter)
+                weight_shape = [Nfilter, Nfilter]#Nfilter.concatenate(Nfilter)
                 self.weights[key+'_w'] = tf.Variable(tf.zeros(weight_shape), name = key+'_w')
             self.shape = { key: weight.get_shape() for key, weight in self.weights.iteritems() }
         else:
             super(Weights_individual, self).__init__(args, kwargs)
+
+    def _gram_matrix(self, F):
+        F = np.split(F, F.shape[0])
+        gram = map(lambda x: np.tensordot(x, x, axes = ( [0,1,2], [0,1,2] )), F)
+        return np.stack(gram)
+        # Ft = tf.reshape(F, (M, N))
+        # return tf.matmul(tf.transpose(Ft), Ft)
+
+    def get_X(self, graph, sess):
+        X = {}
+        for key, value in graph.iteritems():
+            coeffs = graph[key].eval()
+            X[key] = self._gram_matrix(coeffs)
+        return X
+
+    def compute_reg(self, X):
+
+        def _inner_prod(t1, t2):
+            return tf.reduce_sum(tf.mul(t1,t2), [1,2])
+
+        return tf.add_n([_inner_prod(weight, X[key[:-2]]) for key, weight in self.weights.iteritems() ])
