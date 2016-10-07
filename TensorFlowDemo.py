@@ -106,9 +106,9 @@ def style_loss_func_new(sess, model, filters):
         result = (1.0 / (4 * N**2 * M**2)) * tf.reduce_sum(tf.pow(G - A, 2))
         return result
 
-    total_weights = tf.to_float(tf.add_n([ tf.add_n(dic.values()) for dic in filters.values()]))
+    # total_weights = tf.to_float(tf.add_n([ tf.add_n(dic.values()) for dic in filters.values()]))
     E = [_style_loss(sess.run(model[layer_name]), model[layer_name], filters[layer_name]) for layer_name in filters.keys()]
-    return tf.div(tf.add_n(E), total_weights)
+    return tf.add_n(E)# tf.div(tf.add_n(E), total_weights)
 
 
 def style_loss_func_bk(sess, model, filters):
@@ -212,8 +212,8 @@ def train(restore, stylew):
         input_image = load_image(INITIAL_IMAGE, image_width=IMAGE_WIDTH, image_height=IMAGE_HEIGHT)
         print('use initial image: ', INITIAL_IMAGE)
     except:
-        # input_image = generate_noise_image(content_image, image_height=IMAGE_HEIGHT, image_width=IMAGE_WIDTH, color_channels=COLOR_CHANNELS)
-        input_image = generate_noise_image(style_image, image_height=IMAGE_HEIGHT, image_width=IMAGE_WIDTH, color_channels=COLOR_CHANNELS)
+        input_image = generate_noise_image(content_image, image_height=IMAGE_HEIGHT, image_width=IMAGE_WIDTH, color_channels=COLOR_CHANNELS)
+        # input_image = generate_noise_image(style_image, image_height=IMAGE_HEIGHT, image_width=IMAGE_WIDTH, color_channels=COLOR_CHANNELS)
 
     # add image summary
     tf.image_summary("style image", tf.to_float(style_image), collections=("input",) )
