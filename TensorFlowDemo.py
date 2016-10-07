@@ -14,7 +14,7 @@ from util import *
 
 # Noise ratio. Percentage of weight of the noise for intermixing with the
 # content image.
-NOISE_RATIO = 0.2#0.6
+NOISE_RATIO = 0.6#0.6
 
 def content_loss_func(sess, model):
     """
@@ -97,12 +97,17 @@ def style_loss_func_new(sess, model, filters):
         Ft = tf.reshape(F, (M, N))
         return tf.matmul(tf.transpose(Ft), Ft)
 
-    def _style_loss(a, x, fs):
+    def _style_loss(a, x, fw):
         N = a.shape[3]
         M = a.shape[1] * a.shape[2]
-        fw = fs #_get_filter_weights(fs, N)
-        A = _gram_matrix(tf.mul(a, fw), N, M)
-        G = _gram_matrix(tf.mul(x, fw), N, M)
+        if fw.size == N:
+            # fw = _get_filter_weights(fs, N)
+            A = _gram_matrix(tf.mul(a, fw), N, M)
+            G = _gram_matrix(tf.mul(x, fw), N, M)
+        elif fw.size == N**2:
+            A = tf.mul(_gram_matrix(a, N, M), fw)
+            G = tf.mul(_gram_matrix(x, N, M), fw)
+
         result = (1.0 / (4 * N**2 * M**2)) * tf.reduce_sum(tf.pow(G - A, 2))
         return result
 
@@ -183,7 +188,7 @@ def train(restore, stylew):
     # Style image to use.
     STYLE_IMAGE = 'images/inputs/Nr2_original_p1-ds.jpg' #'images/inputs/Nr2_orig.jpg'
     # Content image to use.
-    CONTENT_IMAGE = 'images/inputs/hummingbird-photo_p1-rot.jpg' #'images/inputs/hummingbird-small.jpg'
+    CONTENT_IMAGE = 'images/inputs/Nr2_original_p1-ds.jpg'#'images/inputs/hummingbird-photo_p1-rot.jpg' #'images/inputs/hummingbird-small.jpg'
     # Initial imae to use.
     INITIAL_IMAGE = restore #'output/12000.png'
     # Constant to put more emphasis on content loss.
@@ -228,8 +233,8 @@ def train(restore, stylew):
     content_loss = content_loss_func(sess, model)
     # Construct style_loss using style_image.
     sess.run(model['input'].assign(style_image))
-    style_loss = style_loss_func_new(sess, model,load_dictionary("test.pkl"))
-    # style_loss = style_loss_func(sess, model)
+    # style_loss = style_loss_func_new(sess, model,load_dictionary("test.pkl"))
+    style_loss = style_loss_func(sess, model)
     # total variation loss on reconstruction
     tv_loss = tv_loss_func(model['input'])
     # Instantiate equation 7 of the paper.
