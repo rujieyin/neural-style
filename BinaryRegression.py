@@ -19,6 +19,9 @@ CROP_WIDTH = 127
 
 VGG_MODEL = 'imagenet-vgg-verydeep-19.mat'
 
+# from WeightClass import Weights_individual as Weights
+from WeightClass import Weights_covariance as Weights
+'''
 class Weights:
 
     def __init__(self, *args, **kwargs):
@@ -75,7 +78,7 @@ class Weights:
 
         # sum of inner products of output coeffs and weights
         return sum([_inner_prod(weight, graph[key[:-2]]) for key, weight in self.weights.iteritems() ])
-
+'''
 
 def build_graph(image):
     graph = load_vgg_model(VGG_MODEL, input_image = image)
@@ -133,7 +136,7 @@ def save_Weight(filename, w):
 
 def load_Weight(filename):
     Wfile = np.load(filename)
-    return Weights(npzfile = Wfile)
+    return Weights(val = Wfile)
 
 def prepare_input(images, labels, Ncrops):
 #    Ncrops = 10
@@ -141,6 +144,12 @@ def prepare_input(images, labels, Ncrops):
     random_crop_images = tf.concat(0, [tf.random_crop(images, crop_shape) for i in range(Ncrops)])
     labels = tf.to_float(tf.tile(labels, [Ncrops]))
     return (random_crop_images, labels)
+
+# def get_X(graph, sess):
+#     X = {}
+#     for key, value in graph.iteritems():
+#         X[key] = graph[key].eval()
+#     return X
 
 @click.command()
 @click.option("--numcrops", "-n", type=int, default=10, help="number of random crops from images")
@@ -160,15 +169,18 @@ def binary_reg(numcrops):
     graph, model_var = build_graph(images)
 
     beta = Weights(graph = graph)
-    regs = beta.compute_reg(graph)
 
     z = Weights(graph = graph)
     u = Weights(graph = graph)
     s = tf.Variable(1e-6, name = 's') # threshold
 
+    sess = start_session(model_var)
+
+    X = beta.get_X(graph, sess) # a dictionary of numpy ndarray (constant)
+    regs = beta.compute_reg(X)
+
     loss = reg_loss(regs, labels) + residual_loss(beta, z, u)
 
-    sess = start_session(model_var)
     print('shape of input images: {}'.format(tf.shape(images).eval()))
     print('shape of input labels: {}'.format(tf.shape(labels).eval()))
 
@@ -196,14 +208,15 @@ def binary_reg(numcrops):
     opt_op = opt.minimize(loss, var_list=beta.weights.values())
 
     itr = 0
-    lr = 4e-6#1e-6 # fixed
+    lr = 4e-2 #4e-6#1e-6 # fixed
     precision = 1e-4 #1e-6
     loss_bd = 1.0e-5
     z_norm = 1
-    max_nitr = 200
+    max_nitr = 300
 
     writer = tf.train.SummaryWriter("output/logs/{}".format(time.strftime('%Y-%m-%d_%H%M%S')), sess.graph)
 
+    sess.run(tf.initialize_all_variables())
     while z_norm > 1e-30 and itr < max_nitr:
         writer.add_summary(sess.run(merged_z), itr)
         loss_val = sess.run(loss)
