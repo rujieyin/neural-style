@@ -29,4 +29,4 @@ different regression models:
   lr : 4e-6
 
 - Weights_covariance,
-  lr : 4e-2
+  lr : 5e-5
