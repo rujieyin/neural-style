@@ -153,8 +153,9 @@ def prepare_input(images, labels, Ncrops):
 
 @click.command()
 @click.option("--numcrops", "-n", type=int, default=10, help="number of random crops from images")
+@click.option("--lr", type=float, default=1e-6, help="learning rate")
 
-def binary_reg(numcrops):
+def binary_reg(numcrops, lr):
     # Content image to use.
     CONTENT_IMAGE = 'images/inputs/hummingbird-photo_p1-rot.jpg' #'images/inputs/hummingbird-small.jpg'
     content_image = load_image(CONTENT_IMAGE, image_width=IMAGE_WIDTH, image_height=IMAGE_HEIGHT)
@@ -208,7 +209,7 @@ def binary_reg(numcrops):
     opt_op = opt.minimize(loss, var_list=beta.weights.values())
 
     itr = 0
-    lr = 4e-2 #4e-6#1e-6 # fixed
+    # lr = 4e-2 #4e-6#1e-6 # fixed
     precision = 1e-4 #1e-6
     loss_bd = 1.0e-5
     z_norm = 1

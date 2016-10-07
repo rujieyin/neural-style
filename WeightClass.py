@@ -91,7 +91,7 @@ class Weights_covariance(Weights):
     def _gram_matrix(self, F):
         N = F.shape[1]*F.shape[2]
         F = np.split(F, F.shape[0])
-        gram = map(lambda x: np.tensordot(x, x, axes = ( [0,1,2], [0,1,2] ))/N**2, F)
+        gram = map(lambda x: np.tensordot(x, x, axes = ( [0,1,2], [0,1,2] ))/N, F)
         return np.stack(gram)
         # Ft = tf.reshape(F, (M, N))
         # return tf.matmul(tf.transpose(Ft), Ft)
@@ -101,6 +101,7 @@ class Weights_covariance(Weights):
         for key, value in graph.iteritems():
             coeffs = graph[key].eval()
             X[key] = self._gram_matrix(coeffs)
+            # print("covariance mean in X layer {}: {:.4e}".format(key, X[key].mean()) )
         return X
 
     def compute_reg(self, X):
