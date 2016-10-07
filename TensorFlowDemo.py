@@ -83,15 +83,15 @@ def style_loss_func(sess, model):
 
 def style_loss_func_new(sess, model, filters):
 
-    def _get_filter_weights(fltr, ndim):
-        findex = fltr.keys()
-        findex.sort()
-        # N = tf.size(findex)
-        N = sess.run(tf.size(findex))
-        idx = tf.constant(findex, dtype=tf.int64, shape=[N, 1])
-        value = tf.constant([fltr[fi] for fi in findex], dtype=tf.float32, shape=[N])
-        shape = tf.constant(ndim, dtype=tf.int64, shape=[1])
-        return tf.sparse_tensor_to_dense(tf.SparseTensor(idx, value, shape))
+    # def _get_filter_weights(fltr, ndim):
+    #     findex = fltr.keys()
+    #     findex.sort()
+    #     # N = tf.size(findex)
+    #     N = sess.run(tf.size(findex))
+    #     idx = tf.constant(findex, dtype=tf.int64, shape=[N, 1])
+    #     value = tf.constant([fltr[fi] for fi in findex], dtype=tf.float32, shape=[N])
+    #     shape = tf.constant(ndim, dtype=tf.int64, shape=[1])
+    #     return tf.sparse_tensor_to_dense(tf.SparseTensor(idx, value, shape))
 
     def _gram_matrix(F, N, M):
         Ft = tf.reshape(F, (M, N))
@@ -100,7 +100,7 @@ def style_loss_func_new(sess, model, filters):
     def _style_loss(a, x, fs):
         N = a.shape[3]
         M = a.shape[1] * a.shape[2]
-        fw = _get_filter_weights(fs, N)
+        fw = fs #_get_filter_weights(fs, N)
         A = _gram_matrix(tf.mul(a, fw), N, M)
         G = _gram_matrix(tf.mul(x, fw), N, M)
         result = (1.0 / (4 * N**2 * M**2)) * tf.reduce_sum(tf.pow(G - A, 2))
