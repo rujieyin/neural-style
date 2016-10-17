@@ -14,7 +14,7 @@ from util import *
 
 # Noise ratio. Percentage of weight of the noise for intermixing with the
 # content image.
-NOISE_RATIO = 0.6#0.6
+NOISE_RATIO = 0.2#0.6
 
 def content_loss_func(sess, model):
     """
@@ -188,7 +188,7 @@ def train(restore, stylew):
     # Style image to use.
     STYLE_IMAGE = 'images/inputs/Nr2_original_p1-ds.jpg' #'images/inputs/Nr2_orig.jpg'
     # Content image to use.
-    CONTENT_IMAGE = 'images/inputs/Nr2_original_p1-ds.jpg'#'images/inputs/hummingbird-photo_p1-rot.jpg' #'images/inputs/hummingbird-small.jpg'
+    CONTENT_IMAGE = 'images/inputs/hummingbird-photo_p1-rot.jpg' #'images/inputs/hummingbird-small.jpg'
     # Initial imae to use.
     INITIAL_IMAGE = restore #'output/12000.png'
     # Constant to put more emphasis on content loss.
@@ -238,8 +238,8 @@ def train(restore, stylew):
     # total variation loss on reconstruction
     tv_loss = tv_loss_func(model['input'])
     # Instantiate equation 7 of the paper.
-    total_loss = BETA * content_loss + ALPHA * style_loss + 1e-3 * tv_loss
-    optimizer = tf.train.AdamOptimizer(0.2) #2.0
+    total_loss = BETA * content_loss + ALPHA * style_loss + 1e-3 * tv_loss # 1e-3
+    optimizer = tf.train.AdamOptimizer(1.0) #0.2#2.0
     train_step = optimizer.minimize(total_loss)
 
     # add summary on loss
