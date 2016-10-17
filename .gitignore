@@ -1,4 +1,4 @@
-!imgs/*
+!imgs/
 .*.swp
 .*.swo
 *.mat
