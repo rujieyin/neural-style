@@ -160,7 +160,7 @@ def binary_reg(numcrops, lr):
     CONTENT_IMAGE = 'images/inputs/hummingbird-photo_p1-rot.jpg' #'images/inputs/hummingbird-small.jpg'
     content_image = load_image(CONTENT_IMAGE, image_width=IMAGE_WIDTH, image_height=IMAGE_HEIGHT)
     # Style image to use.
-    STYLE_IMAGE = 'images/inputs/Nr2_original_p1-ds.jpg' #'images/inputs/Nr2_orig.jpg'
+    STYLE_IMAGE = 'images/transferred-6000.png'#'images/inputs/Nr2_original_p1-ds.jpg' #'images/inputs/Nr2_orig.jpg'
     style_image = load_image(STYLE_IMAGE, image_width=IMAGE_WIDTH, image_height=IMAGE_HEIGHT)
     images, labels = prepare_input(tf.concat(0, [content_image, style_image]) , [0,1] , numcrops)
 

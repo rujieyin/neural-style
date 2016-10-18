@@ -100,6 +100,8 @@ class Weights_covariance(Weights):
         X = {}
         for key, value in graph.iteritems():
             coeffs = graph[key].eval()
+            coeffs_mean = np.mean(np.absolute(coeffs), axis=(1,2), keepdims=True)
+            coeffs = coeffs / (coeffs_mean + 1e-30)
             X[key] = self._gram_matrix(coeffs)
             # print("covariance mean in X layer {}: {:.4e}".format(key, X[key].mean()) )
         return X
