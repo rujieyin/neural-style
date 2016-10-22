@@ -14,7 +14,7 @@ from util import *
 
 # Noise ratio. Percentage of weight of the noise for intermixing with the
 # content image.
-NOISE_RATIO = 0.2#0.6
+NOISE_RATIO = 0.9#0.6
 
 def content_loss_func(sess, model):
     """
@@ -188,7 +188,7 @@ def train(restore, stylew):
     # Style image to use.
     STYLE_IMAGE = 'images/inputs/Nr2_original_p1-ds.jpg' #'images/inputs/Nr2_orig.jpg'
     # Content image to use.
-    CONTENT_IMAGE = 'images/inputs/hummingbird-photo_p1-rot.jpg' #'images/inputs/hummingbird-small.jpg'
+    CONTENT_IMAGE = 'images/inputs/Nr2_original_p1-ds.jpg'#'images/inputs/hummingbird-photo_p1-rot.jpg' #'images/inputs/hummingbird-small.jpg'
     # Initial imae to use.
     INITIAL_IMAGE = restore #'output/12000.png'
     # Constant to put more emphasis on content loss.
@@ -233,8 +233,8 @@ def train(restore, stylew):
     content_loss = content_loss_func(sess, model)
     # Construct style_loss using style_image.
     sess.run(model['input'].assign(style_image))
-    # style_loss = style_loss_func_new(sess, model,load_dictionary("test.pkl"))
-    style_loss = style_loss_func(sess, model)
+    style_loss = style_loss_func_new(sess, model,load_dictionary("test.pkl"))
+    # style_loss = style_loss_func(sess, model)
     # total variation loss on reconstruction
     tv_loss = tv_loss_func(model['input'])
     # Instantiate equation 7 of the paper.
